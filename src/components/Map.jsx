@@ -7,6 +7,7 @@ const NearestLocationMap = () => {
   const [userLocation, setUserLocation] = useState(null);
   const [nearestPoint, setNearestPoint] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [showNaloxoneOnly, setShowNaloxoneOnly] = useState(false);
 
   useEffect(() => {
     if (navigator.geolocation) {
@@ -85,9 +86,11 @@ const NearestLocationMap = () => {
           const query = new Query();
           query.returnGeometry = true;
           query.outFields = ["*"];
-          query.where = "1=1";
+          query.where = showNaloxoneOnly ? "Naloxone_Strips = 1" : "1=1";
 
           queryTask.execute(query).then((result) => {
+            view.graphics.removeAll();
+
             if (result.features.length > 0) {
               const nearest = result.features.reduce((prev, curr) => {
                 const prevProjected = projection.project(
@@ -123,38 +126,58 @@ const NearestLocationMap = () => {
 
               const nearestGraphic = new Graphic({
                 geometry: nearestPointGeometry,
-                symbol: { type: "simple-marker", color: "red", size: "12px" },
+                symbol: {
+                  type: "simple-marker",
+                  color: nearest.attributes.Naloxone_Strips === 1 ? "yellow" : "red",
+                  size: "12px",
+                },
                 attributes: nearest.attributes,
                 popupTemplate: {
                   title: nearest.attributes.name || "Addiction Center",
-                  content: `
-                    <p><strong>Address:</strong> ${
-                      nearest.attributes.address || "N/A"
-                    }</p>
-                    <p><strong>City:</strong> ${nearest.attributes.city || "N/A"}</p>
-                  `,
+                  content: Object.keys(nearest.attributes)
+                    .map((key) => {
+                      const value =
+                        key === "Naloxone_Strips"
+                          ? nearest.attributes[key] === 1
+                            ? "Yes"
+                            : "No"
+                          : nearest.attributes[key] ?? "N/A";
+                      return `<p><strong>${key}:</strong> ${value}</p>`;
+                    })
+                    .join(""),
                 },
               });
 
               view.graphics.addMany([userGraphic, nearestGraphic]);
 
-              // Add all other features to the map
               result.features.forEach((feature) => {
                 if (feature !== nearest) {
+                  const hasNaloxone = feature.attributes.Naloxone_Strips === 1;
+
                   const featureGraphic = new Graphic({
                     geometry: feature.geometry,
-                    symbol: { type: "simple-marker", color: "gray", size: "8px" },
+                    symbol: {
+                      type: "simple-marker",
+                      color: hasNaloxone ? "yellow" : "gray",
+                      size: "8px",
+                    },
                     attributes: feature.attributes,
                     popupTemplate: {
                       title: feature.attributes.name || "Addiction Center",
-                      content: `
-                        <p><strong>Address:</strong> ${
-                          feature.attributes.address || "N/A"
-                        }</p>
-                        <p><strong>City:</strong> ${feature.attributes.city || "N/A"}</p>
-                      `,
+                      content: Object.keys(feature.attributes)
+                        .map((key) => {
+                          const value =
+                            key === "Naloxone_Strips"
+                              ? feature.attributes[key] === 1
+                                ? "Yes"
+                                : "No"
+                              : feature.attributes[key] ?? "N/A";
+                          return `<p><strong>${key}:</strong> ${value}</p>`;
+                        })
+                        .join(""),
                     },
                   });
+
                   view.graphics.add(featureGraphic);
                 }
               });
@@ -168,7 +191,7 @@ const NearestLocationMap = () => {
         });
       }
     ).finally(() => setIsLoading(false));
-  }, [userLocation]);
+  }, [userLocation, showNaloxoneOnly]);
 
   const handleDirectionsClick = () => {
     if (!nearestPoint) {
@@ -198,9 +221,68 @@ const NearestLocationMap = () => {
           >
             {isLoading ? "Loading..." : "Get Directions"}
           </button>
+
+          <div className="form-check mt-3">
+            <input
+              className="form-check-input"
+              type="checkbox"
+              checked={showNaloxoneOnly}
+              onChange={() => setShowNaloxoneOnly((prev) => !prev)}
+              id="naloxoneToggle"
+            />
+            <label className="form-check-label" htmlFor="naloxoneToggle">
+              Show Only Naloxone Locations
+            </label>
+          </div>
+
+          <hr className="my-3" />
+          <h2 className="h6 fw-bold mb-2">Legend</h2>
+          <ul className="list-unstyled small">
+            <li className="d-flex align-items-center mb-2">
+              <span
+                style={{
+                  width: 15,
+                  height: 15,
+                  backgroundColor: "yellow",
+                  display: "inline-block",
+                  marginRight: 8,
+                }}
+              ></span>
+              Naloxone Available
+            </li>
+            <li className="d-flex align-items-center mb-2">
+              <span
+                style={{
+                  width: 15,
+                  height: 15,
+                  backgroundColor: "red",
+                  display: "inline-block",
+                  marginRight: 8,
+                }}
+              ></span>
+              Nearest Location
+            </li>
+            <li className="d-flex align-items-center">
+              <span
+                style={{
+                  width: 15,
+                  height: 15,
+                  backgroundColor: "gray",
+                  display: "inline-block",
+                  marginRight: 8,
+                }}
+              ></span>
+              Other Locations
+            </li>
+          </ul>
         </aside>
+
         <main className="flex-grow-1 p-3">
-          <div ref={mapRef} className="rounded shadow" style={{ width: "100%", height: "100%" }} />
+          <div
+            ref={mapRef}
+            className="rounded shadow"
+            style={{ width: "100%", height: "100%" }}
+          />
         </main>
       </div>
     </div>
