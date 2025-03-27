@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { loadModules } from "esri-loader";
+import AddLocationWidget from "./AddLocationWidget";
 import "../style/Map.css";
 
 const NearestLocationMap = () => {
@@ -8,6 +9,8 @@ const NearestLocationMap = () => {
   const [nearestPoint, setNearestPoint] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [showNaloxoneOnly, setShowNaloxoneOnly] = useState(false);
+  const [viewInstance, setViewInstance] = useState(null);
+
 
   useEffect(() => {
     if (navigator.geolocation) {
@@ -66,6 +69,7 @@ const NearestLocationMap = () => {
           center: userLocation,
           zoom: 10,
         });
+        setViewInstance(view);
 
         const userPoint = new Point({
           longitude: userLocation[0],
@@ -275,6 +279,10 @@ const NearestLocationMap = () => {
               Other Locations
             </li>
           </ul>
+            <AddLocationWidget
+            view={viewInstance}
+            onFeatureAdded={() => setUserLocation([...userLocation])}
+            />
         </aside>
 
         <main className="flex-grow-1 p-3">
